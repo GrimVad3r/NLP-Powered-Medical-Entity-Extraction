@@ -1,0 +1,28 @@
+name: 'nlp_medical_dbt'
+version: '1.0.0'
+config-version: 2
+
+# This determines where dbt looks for things
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# This profile name must match the name in your C:\Users\henokt\.dbt\profiles.yml
+profile: 'nlp_medical_dbt'
+
+models:
+  nlp_medical_dbt:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: table
+    marts:
+      +materialized: table

@@ -9,7 +9,7 @@ from typing import List, Optional, Any, Dict
 from datetime import datetime
 
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, and_
+from sqlalchemy import desc, and_,text
 
 from src.core.logger import get_logger
 from src.database.models import Message, Channel, Entity, Product, Price
@@ -172,11 +172,28 @@ class EntityCRUD:
 
         from sqlalchemy import func
         return (
-            query.group_by(Entity.text, Entity.entity_type)
-            .order_by(desc(func.count(Entity.id)))
-            .limit(limit)
-            .all()
-        )
+                query.group_by(Entity.text, Entity.entity_type)
+                .order_by(desc(func.count(Entity.id)))
+                .limit(limit)
+                .all()
+            )
+    
+    def get_analytics_top_products(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        FETCH from the dbt-transformed Mart table.
+        This solves your 'no association' issue.
+        """
+        # We use a raw text query here because fct_medical_mentions 
+        # is managed by dbt, not SQLAlchemy models.
+        query = f"""
+            SELECT entity_name, entity_type, mention_count 
+            FROM public.fct_medical_mentions 
+            WHERE entity_type = 'DRUG'
+            ORDER BY mention_count DESC 
+            LIMIT {limit}
+        """
+        result = self.session.execute(text(query))
+        return [dict(row) for row in result]
 
     def count(self, entity_type: Optional[str] = None) -> int:
         """Count entities."""

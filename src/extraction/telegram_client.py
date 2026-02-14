@@ -10,6 +10,7 @@ import logging
 from typing import List, Optional, Dict, Any
 
 from telethon import TelegramClient, events
+from telethon import connection  # FIXED: Missing import
 
 from src.core.config import get_settings
 from src.core.exceptions import TelegramClientError, TelegramAuthenticationError
@@ -21,7 +22,16 @@ logger = get_logger(__name__)
 class TelegramClientWrapper:
     """Wrapper around Telethon client with error handling."""
 
-    def __init__(self, api_id: int, api_hash: str, phone: str, session_name: str = "medical_bot"):
+    def __init__(
+        self, 
+        api_id: int, 
+        api_hash: str, 
+        phone: str,
+        proxy_addr: str,
+        proxy_port: int,
+        proxy_secret: str,
+        session_name: str = "medical_bot"
+    ):
         """
         Initialize Telegram client.
 
@@ -29,6 +39,9 @@ class TelegramClientWrapper:
             api_id: Telegram API ID
             api_hash: Telegram API hash
             phone: Phone number with country code
+            proxy_addr: MTProto proxy address
+            proxy_port: MTProto proxy port
+            proxy_secret: MTProto proxy secret
             session_name: Session file name
 
         Raises:
@@ -40,8 +53,25 @@ class TelegramClientWrapper:
             self.phone = phone
             self.session_name = session_name
 
-            self.client = TelegramClient(session_name, api_id, api_hash)
-            logger.info(f"Telegram client initialized for {phone}")
+            self.proxy_addr = proxy_addr
+            self.proxy_port = int(proxy_port) if proxy_port else None
+            self.proxy_secret = proxy_secret
+
+            # FIXED: Proper syntax for TelegramClient initialization
+            # FIXED: Only set proxy if all proxy parameters are provided
+            if self.proxy_addr and self.proxy_port and self.proxy_secret:
+                self.client = TelegramClient(
+                    session_name, 
+                    api_id, 
+                    api_hash,
+                    connection=connection.ConnectionTcpMTProxyRandomizedIntermediate,
+                    proxy=(self.proxy_addr, self.proxy_port, self.proxy_secret)
+                )
+                logger.info(f"Telegram client initialized with MTProto proxy for {phone}")
+            else:
+                # No proxy - direct connection
+                self.client = TelegramClient(session_name, api_id, api_hash)
+                logger.info(f"Telegram client initialized (no proxy) for {phone}")
 
         except Exception as e:
             raise TelegramClientError(
@@ -72,13 +102,20 @@ class TelegramClientWrapper:
                 try:
                     await self.client.sign_in(self.phone, code)
                 except Exception as e:
-                    raise TelegramAuthenticationError(
-                        f"Failed to sign in: {str(e)}"
-                    )
+                    # FIXED: Better error handling for 2FA
+                    if "password" in str(e).lower():
+                        password = input("Two-factor authentication enabled. Enter your password: ")
+                        await self.client.sign_in(password=password)
+                    else:
+                        raise TelegramAuthenticationError(
+                            f"Failed to sign in: {str(e)}"
+                        )
 
             logger.info("Successfully connected to Telegram")
             return True
 
+        except TelegramAuthenticationError:
+            raise
         except Exception as e:
             raise TelegramClientError(
                 f"Connection failed: {str(e)}"
@@ -227,10 +264,14 @@ async def create_telegram_client() -> TelegramClientWrapper:
     """
     settings = get_settings()
 
+    # FIXED: Pass proxy parameters to wrapper
     client = TelegramClientWrapper(
         api_id=settings.telegram_api_id,
         api_hash=settings.telegram_api_hash,
         phone=settings.telegram_phone,
+        proxy_addr=getattr(settings, 'telegram_proxy_addr', None),
+        proxy_port=getattr(settings, 'telegram_proxy_port', None),
+        proxy_secret=getattr(settings, 'telegram_proxy_secret', None),
     )
 
     await client.connect()
@@ -250,5 +291,5 @@ if __name__ == "__main__":
 
         await client.disconnect()
 
-    if sys.version_info >= (3, 7):
-        asyncio.run(main())
+    # FIXED: Simplified asyncio.run check
+    asyncio.run(main())

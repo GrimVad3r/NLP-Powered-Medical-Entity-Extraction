@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from contextlib import asynccontextmanager
 
 from src.core.config import get_settings
 from src.core.logger import get_logger
@@ -18,9 +19,15 @@ from src.nlp.medical_ner import MedicalEntity
 logger = get_logger(__name__)
 settings = get_settings()
 
-# Initialize NLP processor
-processor = MedicalMessageProcessor()
-
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Load the ML model when the app starts
+    logger.info("Loading NLP models...")
+    app.state.processor = MedicalMessageProcessor()
+    yield
+    # Clean up the ML model and release resources on shutdown
+    logger.info("Cleaning up NLP models...")
+    del app.state.processor
 
 # ============================================================================
 # Request/Response Models
@@ -36,16 +43,17 @@ class MedicalEntityResponse(BaseModel):
     normalized: Optional[str] = None
 
     class Config:
-        schema_extra = {
-            "example": {
-                "text": "Amoxicillin",
-                "entity_type": "MEDICATION",
-                "start_char": 0,
-                "end_char": 11,
-                "confidence": 0.95,
-                "normalized": "Amoxicillin"
-            }
-        }
+                model_config = {
+                    "json_schema_extra": {
+                        "examples": [
+                            {
+                                "text": "Amoxicillin",
+                                "entity_type": "MEDICATION",
+                                # ...
+                            }
+                        ]
+                    }
+                }
 
 
 class ProcessMessageRequest(BaseModel):
@@ -125,6 +133,7 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
+        lifespan=lifespan
     )
 
     # Configure CORS
@@ -209,7 +218,7 @@ def create_app() -> FastAPI:
         try:
             logger.info(f"Processing message: {request.text[:100]}...")
 
-            result = processor.process_message(request.text)
+            result = app.state.processor.process_message(request.text)
 
             if result.processing_status == "error":
                 raise HTTPException(

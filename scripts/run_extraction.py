@@ -18,12 +18,15 @@ from src.core.logger import get_logger
 from src.extraction.telegram_client import create_telegram_client
 from src.extraction.channel_scraper import ChannelScraper
 
+import json
+import os
+
 logger = get_logger(__name__)
 
 
 async def run_extraction(
     channels: list,
-    limit: int = 1000,
+    limit: int = 2000,
     keywords: list = None,
 ):
     """
@@ -54,7 +57,28 @@ async def run_extraction(
         total_messages = sum(len(msgs) for msgs in all_results.values())
         logger.info(f"✅ Total messages scraped: {total_messages}")
 
+        # --- NEW: SAVING LOGIC ---
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_data_path = Path("./data/raw")
+
         for channel, messages in all_results.items():
+            # 1. Create directory: data/raw/channel_name/
+            channel_path = base_data_path / channel
+            channel_path.mkdir(parents=True, exist_ok=True)
+
+            # 2. Define filename (timestamped to avoid overwriting)
+            file_path = channel_path / f"scrape_{timestamp}.json"
+
+            # 3. Save the messages
+            with open(file_path, "w", encoding="utf-8") as f:
+                # Convert date objects to strings for JSON serializability
+                json.dump(messages, f, indent=4, default=str)
+            
+            logger.info(f"💾 Saved {len(messages)} messages to {file_path}")
+
+            total_messages = sum(len(msgs) for msgs in all_results.values())
+            logger.info(f"✅ Total messages scraped: {total_messages}")
+
             logger.info(f"  - {channel}: {len(messages)} messages")
 
         # Get channel stats

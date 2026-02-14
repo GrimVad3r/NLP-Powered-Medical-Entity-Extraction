@@ -9,7 +9,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseSettings, validator
+from pydantic_settings import BaseSettings
+from pydantic import validator
 
 
 class Settings(BaseSettings):
@@ -25,21 +26,24 @@ class Settings(BaseSettings):
     db_host: str = "localhost"
     db_port: int = 5432
     db_user: str = "postgres"
-    db_password: str = ""
-    db_name: str = "medical_db"
+    db_password: str = "12345678"
+    db_name: str = "nlp_medical_warehouse"
     db_pool_size: int = 20
     db_max_overflow: int = 40
     db_echo: bool = False
 
     # Telegram
-    telegram_api_id: int
-    telegram_api_hash: str
-    telegram_phone: str
+    telegram_api_id: int = 26042740
+    telegram_api_hash: str = "86adfaa83a53af9f9d2da6cda3ec6feb"
+    telegram_phone: str= "+251912845832"
     telegram_channels: list[str] = [
-        "CheMedTelegram",
-        "LobeliaCosmeticsOfficial",
-        "TikvahPharma"
+        "CheMed123",
+        "lobelia4cosmetics",
+        "tikvahpharma"
     ]
+    telegram_proxy_addr : str = "185.115.161.242" 
+    telegram_proxy_port : int = 9443
+    telegram_proxy_secret : str = "dd104462821249bd7ac519130220c25d09"
 
     # NLP
     nlp_use_gpu: bool = False

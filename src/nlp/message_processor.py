@@ -64,7 +64,7 @@ class MedicalMessageProcessor:
 
     def __init__(
         self,
-        use_gpu: bool = False,
+        use_gpu: bool = True,
         nlp_model: str = "en_core_sci_md",
         classifier_model: str = "distilbert-base-uncased-finetuned-sst-2-english"
     ):
@@ -77,7 +77,7 @@ class MedicalMessageProcessor:
             classifier_model: Text classifier model name
         """
         self.ner = MedicalNER(model_name=nlp_model)
-        self.classifier = MedicalTextClassifier(model_name=classifier_model)
+        self.classifier = MedicalTextClassifier(model_path=classifier_model)
         self.entity_linker = MedicalEntityLinker()
 
         logger.info("Medical message processor initialized")

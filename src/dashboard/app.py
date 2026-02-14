@@ -9,6 +9,7 @@ import streamlit as st
 from streamlit import session_state as ss
 import sys
 from pathlib import Path
+import requests
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -156,32 +157,26 @@ elif page == "💊 Products":
 
     try:
         session = get_db_session()
+        entity_service = EntityCRUD(session)
         prod_crud = ProductCRUD(session)
 
         # Top products
         st.write("#### Top 10 Products")
 
-        top_products = prod_crud.get_top_products(limit=10)
+        top_products = top_products = entity_service.get_analytics_top_products(limit=10)
 
         if top_products:
-            product_data = []
-            for prod in top_products:
-                product_data.append({
-                    "Name": prod.name,
-                    "Category": prod.category,
-                    "Mentions": prod.mention_count,
-                    "Avg Price": f"${prod.avg_price:.2f}" if prod.avg_price else "N/A",
-                })
-
-            st.dataframe(product_data, use_container_width=True)
+                # Display as an interactive table
+                st.dataframe(top_products, use_container_width=True)
+                
+                # Add a bar chart for visual impact
+                chart_data = {item['entity_name']: item['mention_count'] for item in top_products}
+                st.bar_chart(chart_data)
         else:
-            st.info("No products found")
-
-        session.close()
+                st.info("No transformed analytics found. Did you run 'dbt run'?")
 
     except Exception as e:
-        st.error(f"Error loading products: {e}")
-
+            st.error(f"Dashboard Error: {e}")
 
 # Pricing page
 elif page == "📈 Pricing":

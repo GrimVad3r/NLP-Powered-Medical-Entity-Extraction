@@ -1,45 +1,36 @@
-"""
-Medical text classification using transformers.
-
-BRANCH-3: NLP Pipeline
-Author: Boris (Claude Code)
-"""
-
+import os
+from pathlib import Path
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Tuple, List
 
 from transformers import pipeline
-
 from src.core.exceptions import ModelLoadingError, TextClassificationError
 from src.core.logger import get_logger
 
 logger = get_logger(__name__)
 
+# --- NEW: Local Path Configuration ---
+# This ensures we look in the models folder relative to the project root
+BASE_DIR = Path(__file__).parent.parent.parent
+DEFAULT_LOCAL_MODEL = str(BASE_DIR / "models" / "nlp_models" / "classifier")
 
 @dataclass
 class ClassificationResult:
-    """Text classification result."""
-
     label: str  # "medical" or "non-medical"
     confidence: float
     reasoning: str = ""
 
     def is_medical(self) -> bool:
-        """Check if text is classified as medical."""
         return self.label.lower() == "medical"
 
     def to_dict(self) -> dict:
-        """Convert to dictionary."""
         return {
             "label": self.label,
             "confidence": self.confidence,
             "reasoning": self.reasoning,
         }
 
-
 class MedicalTextClassifier:
-    """Classify text as medical or non-medical."""
-
     MEDICAL_KEYWORDS = {
         "medication", "drug", "medicine", "treatment", "disease",
         "symptom", "patient", "doctor", "hospital", "clinic",
@@ -49,26 +40,33 @@ class MedicalTextClassifier:
         "malaria treatment", "artemether", "amoxicillin", "paracetamol"
     }
 
-    def __init__(self, model_name: str = "distilbert-base-uncased-finetuned-sst-2-english"):
+    def __init__(self, model_path: str = DEFAULT_LOCAL_MODEL):
         """
-        Initialize classifier.
-
-        Args:
-            model_name: HuggingFace model name
-
-        Raises:
-            ModelLoadingError: If model fails to load
+        Initialize classifier using local assets.
         """
         try:
+            # Check if local model exists to provide better error messages
+            if not os.path.exists(os.path.join(model_path, "config.json")):
+                logger.warning(f"Local model not found at {model_path}. Falling back to hub name.")
+                # Fallback to name only if local path doesn't exist
+                model_to_load = "distilbert-base-uncased-finetuned-sst-2-english"
+                local_only = False
+            else:
+                model_to_load = model_path
+                local_only = True
+
             self.classifier = pipeline(
                 "text-classification",
-                model=model_name,
-                device=-1  # CPU, set to 0 for GPU
+                model=model_to_load,
+                tokenizer=model_to_load,
+                device=-1, # Force CPU
+                local_files_only=local_only # 👈 CRITICAL: Prevents network calls
             )
-            logger.info(f"Loaded text classifier: {model_name}")
+            logger.info(f"Loaded text classifier from: {model_to_load}")
+            
         except Exception as e:
             raise ModelLoadingError(
-                f"Failed to load classifier model: {model_name}",
+                f"Failed to load classifier model from: {model_path}",
                 details={"error": str(e)}
             )
 
